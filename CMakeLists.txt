@@ -5,12 +5,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_executable(CEngine
-        src/main.c
-        src/entities/E_test.c
-        src/systems/S_value_increase.c
-
-        ECS/src/ecs_core.c
-        ECS/src/components_tags.c
+        main.c
 )
 
 target_include_directories(CEngine PRIVATE

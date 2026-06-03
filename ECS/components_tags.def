@@ -1,6 +1,6 @@
 //Components
 
-COMPONENT(Test, {
+COMPONENT(Example, {
     int value;
 })
 
