@@ -4,384 +4,174 @@ A lightweight, macro-based Entity Component System (ECS) implementation written 
 
 ## Overview
 
-ECS_C provides a flexible framework for building applications using the Entity Component System pattern. Instead of traditional inheritance hierarchies, ECS_C uses composition, where entities are collections of components.
+ECS_C provides a flexible framework for building applications using the Entity Component System pattern. Instead of traditional inheritance hierarchies, ECS_C uses composition, where entities are collections of components and tags. The library uses powerful macros to simplify entity and component management while maintaining high performance.
 
 **Key Features:**
 - **Macro-based API** - Clean, expressive syntax with compile-time code generation
-- **Component Signatures** - Efficient bitmask-based component tracking (256-bit support)
-- **Entity Pooling** - Reusable entity IDs with generation counters
-- **No Memory Allocation** - Stack-based approach with fixed entity limits
-- **High Performance** - Cache-friendly data layout and minimal overhead
-- **Tag System** - Zero-cost tag components for efficient filtering
-- **Compact Iteration** - ForEachEntityWith macro for filtered entity iteration
-- **Definition Files** - Declarative component/tag definitions in `.def` files
+- **Component Signatures** - Efficient bitmask-based component tracking
+- **Entity Pooling** - Automatic entity ID recycling for memory efficiency
+- **Flexible Storage** - Dynamic allocation with automatic resizing
+- **Tag System** - Lightweight component-less categorization
+- **System Queries** - Iterate over entities with specific components/tags
 
 ## Installation
 
-### As a Module (For Use in Your Project)
-
-If you only need the ECS library, copy just the `ECS` folder to your project:
-
-```bash
-# Copy the ECS module to your project
-cp -r ECS /path/to/your/project/
-```
-
-Then in your `CMakeLists.txt`:
-
-```cmake
-# Include the ECS module
-add_subdirectory(ECS)
-
-# Link ECS to your executable
-add_executable(your_app main.c)
-target_link_libraries(your_app PRIVATE ECS)
-target_include_directories(your_app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ECS/include)
-```
-
-And in your C files:
+1. Copy the `ECS` folder to your project directory
+2. Include `ecs_core.h` in your main file with the `ECS_IMPLEMENTATION` define:
 
 ```c
-#include "ecs_core.h"
-#include "components_tags.h"  // For using defined components/tags
+#define ECS_IMPLEMENTATION
+#include "ECS/ecs_core.h"
 ```
 
-### As a Complete Project (For Development/Examples)
+3. Refer to `components_tags.def` to define your components and tags
 
-To use the entire repository with example components and systems:
-
-```bash
-# Clone or download the entire repository
-git clone https://github.com/RedCore0/ECS_C.git
-cd ECS_C
-
-# Build the example project
-mkdir build && cd build
-cmake ..
-cmake --build .
-```
-
-## Prerequisites
-
-- **C99** or later compiler (GCC, Clang, or MSVC)
-- **CMake 3.15** or higher
+That's it! No build configuration needed.
 
 ## Quick Start
 
-### 1. Define Components and Tags in `components_tags.def`
+### 1. Define Components and Tags
 
-Create a definition file to declare your components and tags using the declarative syntax:
+Create or modify `ECS/components_tags.def`:
 
-**`ECS/include/components_tags.def`**
 ```c
-// Components with their data structure
-COMPONENT(Position, {
-    float x;
-    float y;
-})
-
-COMPONENT(Velocity, {
-    float vx;
-    float vy;
-})
-
-COMPONENT(Health, {
-    int hp;
-    int maxHp;
-})
-
-// Tags (zero-cost markers)
-TAG(Player)
-TAG(Enemy)
+COMPONENT(Example, { int value; })
+COMPONENT(Position, { float x, y; })
+TAG(Default)
 TAG(Active)
 ```
 
-The `.def` file uses the `COMPONENT(Name, Body)` and `TAG(Name)` macros which are automatically expanded by:
-- `components_tags.h` - Generates typedefs and declares functions
-- `components_tags.c` - Implements component/tag operations
+### 2. Initialize and Use
 
-**That's it!** Your components and tags are now ready to use.
-
-### 2. Create an Entity Type
-
-Define entity constructors that initialize entities with default components:
-
-**`src/entities/player_entity.h`**
 ```c
-#ifndef PLAYER_ENTITY_H
-#define PLAYER_ENTITY_H
-#include "ecs_core.h"
-
-struct Entity InstantiatePlayerEntity(float x, float y);
-
-#endif
-```
-
-**`src/entities/player_entity.c`**
-```c
-#include "entities/player_entity.h"
-#include "components_tags.h"
-
-struct Entity InstantiatePlayerEntity(float x, float y) {
-    struct Entity entity;
-    InitializeEntity(&entity);
-    
-    AddComponent(&entity, Position, .x = x, .y = y);
-    AddComponent(&entity, Velocity, .vx = 0, .vy = 0);
-    AddComponent(&entity, Health, .hp = 100, .maxHp = 100);
-    AddTag(&entity, Player);
-    AddTag(&entity, Active);
-    
-    return entity;
-}
-```
-
-### 3. Create Systems
-
-Systems process entities that match certain component signatures using the `ForEachEntityWith` macro:
-
-**`src/systems/movement_system.h`**
-```c
-#ifndef MOVEMENT_SYSTEM_H
-#define MOVEMENT_SYSTEM_H
-
-void MovementSystem(float deltaTime);
-
-#endif
-```
-
-**`src/systems/movement_system.c`**
-```c
-#include "systems/movement_system.h"
-#include "components_tags.h"
-#include "ecs_core.h"
-
-void MovementSystem(float deltaTime) {
-    // Process all entities that have both Position and Velocity components
-    ForEachEntityWith(entity_id, COMPONENT_Position, COMPONENT_Velocity) {
-        // GetComponent returns a reference to the component data
-        GetComponent(entity_id, Position).x += GetComponent(entity_id, Velocity).vx * deltaTime;
-        GetComponent(entity_id, Position).y += GetComponent(entity_id, Velocity).vy * deltaTime;
-    }
-}
-```
-
-### 4. Use in Main
-
-**`src/main.c`**
-```c
-#include "ecs_core.h"
-#include "components_tags.h"
-#include "entities/player_entity.h"
-#include "systems/movement_system.h"
+#define ECS_IMPLEMENTATION
+#include "ECS/ecs_core.h"
 
 int main(void) {
-    InitializeStack(&AvailableIDs);
-    
-    // Create a player entity using InstantiateEntity macro
-    struct Entity player = InstantiateEntity(Player, 10.0f, 20.0f);
-    
-    // Modify components directly through the component data array
-    GetComponent(player.id, Velocity).vx = 5.0f;
-    GetComponent(player.id, Velocity).vy = 0.0f;
-    
-    // Run systems
-    MovementSystem(0.016f);  // 16ms frame time
-    
-    // Query component data
-    if (HasComponent(&player, Health)) {
-        HealthComponent health = GetComponent(player.id, Health);
-        printf("Player health: %d/%d\n", health.hp, health.maxHp);
+    // Initialize the ECS system
+    ECS_Init();
+
+    // Create an entity with components and tags
+    CreateEntity(e_Dummy, {
+        AddTag(&e_Dummy, Default);
+        AddComponent(&e_Dummy, Example, .value = 42);
+    });
+
+    // Access component data
+    const int dummyValue = GetComponent(e_Dummy.id, Example)->value;
+    printf("Entity %d has example component with value: %d\n", e_Dummy.id, dummyValue);
+
+    // Query entities with specific components/tags
+    ForEachEntityWith(entity, TAG_Default) {
+        printf("Entity %d has Default Tag\n", entity);
     }
-    
-    // Check tags
-    if (HasTag(&player, Active)) {
-        printf("Player is active\n");
-    }
-    
+
+    // Remove component
+    RemoveComponent(&e_Dummy, Example);
+
+    // Destroy entity
+    DestroyEntity(&e_Dummy);
+
     // Cleanup
-    RemoveComponent(&player, Position);
-    RemoveComponent(&player, Velocity);
-    RemoveComponent(&player, Health);
-    DestroyEntity(&player);
-    
+    ECS_Shutdown();
     return 0;
 }
 ```
 
-### 5. Update CMakeLists.txt
+## Macro Reference
 
-```cmake
-cmake_minimum_required(VERSION 3.15)
-project(ECS_Example C)
+All available macros are defined in `ecs_core.h`. Here are the most commonly used:
 
-set(CMAKE_C_STANDARD 99)
+### Entity Management
 
-# Add the ECS library
-add_subdirectory(ECS)
-
-# Create executable
-add_executable(example
-    src/main.c
-    src/entities/player_entity.c
-    src/systems/movement_system.c
-)
-
-# Link libraries and include directories
-target_link_libraries(example PRIVATE ECS)
-target_include_directories(example PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/entities
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/systems
-)
+```c
+CreateEntity(varName, { ... })     // Create a new entity and initialize it
+DestroyEntity(&entity)              // Destroy an entity and recycle its ID
+ECS_Init()                           // Initialize the ECS system
+ECS_Shutdown()                       // Cleanup and free all resources
 ```
 
-## Macro Reference
+### Component Operations
+
+```c
+AddComponent(&entity, ComponentName, .field = value)  // Add component to entity
+HasComponent(&entity, ComponentName)                  // Check if entity has component
+GetComponent(entity.id, ComponentName)                // Get pointer to component data
+RemoveComponent(&entity, ComponentName)               // Remove component from entity
+```
+
+### Tag Operations
+
+```c
+AddTag(&entity, TagName)            // Add tag to entity
+HasTag(&entity, TagName)            // Check if entity has tag
+RemoveTag(&entity, TagName)         // Remove tag from entity
+```
+
+### Querying
+
+```c
+ForEachEntityWith(entityVar, TAG_Name, COMPONENT_Name) {
+    // Process entity matching all specified tags/components
+}
+```
+
+### Internal Functions (Advanced)
+
+Refer to `ecs_core.h` for additional utility functions:
+- `Signature_SetBit()`, `Signature_ClearBit()`, `Signature_TestBit()`
+- `Signature_Matches()`, `Signature_ClearAll()`
+- Stack-based operations for ID management
+
+## Component Definition Format
+
+Components are defined in `components_tags.def` using the `COMPONENT` macro:
 
 ### Component and Tag Definition
 
 Define components and tags in a `.def` file:
 
 ```c
-// In components_tags.def
-COMPONENT(ComponentName, {
-    type field1;
-    type field2;
+COMPONENT(MyComponent, {
+    int field1;
+    float field2;
+    char data[128];
 })
-
-TAG(TagName)
 ```
 
-### Component Operations
+The second parameter is the struct body containing your component data.
+
+## Tag Definition Format
+
+Tags are defined in `components_tags.def` using the `TAG` macro:
 
 ```c
-// Add component to entity
-AddComponent(&entity, ComponentName, .field1 = value1, .field2 = value2)
-
-// Check if entity has component
-HasComponent(&entity, ComponentName)
-
-// Get component data (returns a reference to the component array element)
-GetComponent(entity.id, ComponentName)
-
-// Get and modify component data
-GetComponent(entity.id, ComponentName).field = new_value;
-
-// Remove component from entity
-RemoveComponent(&entity, ComponentName)
+TAG(MyTag)
 ```
 
-### Tag Operations
-
-```c
-// Add tag to entity
-AddTag(&entity, TagName)
-
-// Check if entity has tag
-HasTag(&entity, TagName)
-
-// Remove tag from entity
-RemoveTag(&entity, TagName)
-```
-
-### Entity Operations
-
-```c
-// Initialize a new entity
-InitializeEntity(&entity)
-
-// Destroy/recycle entity
-DestroyEntity(&entity)
-
-// Instantiate entity (calls: InstantiateComponentNameEntity(...))
-// This expands to InstantiatePlayerEntity(...) for InstantiateEntity(Player, ...)
-InstantiateEntity(ComponentName, ...args)
-```
-
-### System Iteration
-
-```c
-// Iterate all entities with specific components
-ForEachEntityWith(entity_id, COMPONENT_Type1, COMPONENT_Type2) {
-    // entity_id is the active entity ID being processed
-    // Access component data using GetComponent macro
-    TypeName val1 = GetComponent(entity_id, Type1);
-    TypeName val2 = GetComponent(entity_id, Type2);
-}
-```
-
-## Component Naming Conventions
-
-To properly use the generated macros, follow these naming patterns:
-
-| Definition | Generated Macros | Array Name | Example |
-|-----------|-------------------|---------|---------|
-| `COMPONENT(Test, {...})` | `AddTest`, `HasTest`, `GetTest`, `RemoveTest` | `TestComponentData` | `AddComponent(&e, Test, .field = val)` |
-| `TAG(Active)` | `AddTag_Active`, `HasTag_Active`, `RemoveTag_Active` | N/A | `AddTag(&e, Active)` |
+Tags have no associated data—they're purely for categorization.
 
 ## Architecture
 
-- **Entity**: Unique ID (0-4999) + generation counter
+- **Entity**: An object with a unique ID and generation counter
 - **Component**: Data stored in parallel arrays, indexed by entity ID
-- **Signature**: 256-bit bitmask tracking which components/tags an entity has
-- **System**: Functions that iterate entities with specific signatures
-- **Tag**: Zero-overhead marker components for entity classification
-- **Definition File**: Centralized component/tag declarations
-- **Active Entity List**: Sparse-dense set structure for efficient iteration
+- **Tag**: A lightweight marker with no associated data
+- **Signature**: 64-bit bitmask (256 bits total) tracking which components/tags an entity has
+- **System**: Logic that processes entities matching specific component/tag signatures
 
-## Limits
+## System Limits
 
-- **Maximum entities**: `MAX_ENTITIES` (default 5000, configurable in `ECS/include/ecs_core.h`)
-- **Maximum component/tag types**: 256 (4 x 64-bit chunks)
-- **Memory model**: Stack-allocated arrays (no dynamic allocation)
-- **Thread safety**: Not thread-safe; synchronize externally if needed
+- **Maximum entities**: Dynamically resizable (starts at 32, doubles as needed)
+- **Maximum component types**: 256 (4 chunks × 64 bits)
+- **Dynamic allocation**: All data uses malloc/realloc for flexibility
 
-## File Structure
+## Example: Complete Game Loop
 
-```
-ECS_C/
-├── ECS/                          # Core ECS library
-│   ├── include/
-│   │   ├── ecs_core.h           # Core ECS declarations
-│   │   ├── components_tags.h    # Generated from .def file
-│   │   └── components_tags.def  # Define your components/tags here
-│   ├── src/
-│   │   ├── ecs_core.c
-│   │   └── components_tags.c    # Generated implementations
-│   └── CMakeLists.txt
-├── src/                          # Example application
-│   ├── main.c
-│   ├── entities/
-│   │   └── E_test.c
-│   ├── systems/
-│   │   └── S_value_increase.c
-│   └── CMakeLists.txt
-└── CMakeLists.txt
-```
-
-## Using Components and Tags
-
-### Module Usage (Copy ECS folder only)
-
-1. Copy `ECS/` to your project
-2. Create your own `components_tags.def` in `ECS/include/`
-3. Include and build as described above
-
-### Full Repository Usage
-
-The example project demonstrates:
-- Component definition in `ECS/include/components_tags.def`
-- Entity creation patterns in `src/entities/`
-- System implementation in `src/systems/`
-- Complete usage in `src/main.c`
-
-Run the example:
-```bash
-mkdir build && cd build
-cmake ..
-cmake --build .
-./example  # or example.exe on Windows
-```
+See `main.c` for a complete working example demonstrating:
+- Entity creation with components
+- Component access and modification
+- Tag-based entity queries
+- Entity cleanup
 
 ## License
 
